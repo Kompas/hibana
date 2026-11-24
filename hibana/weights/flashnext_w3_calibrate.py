@@ -35,16 +35,25 @@ class Covariances:
         self.cls, self.original = TrunkLinear, TrunkLinear.__call__
         covariances = self
 
-        def call(lin, x):
+        from hibana.kernels import flashnext_fused as fk
+
+        def call(lin, x, act=0, **kw):
+            # TrunkLinear applies SiLU or SiLU-mul inside the call (`act`): the covariance is over the input the
+            # weight multiplies, so the hooked copy gets the activation first.
             name = covariances.names.get(id(lin))
             if name is not None:
-                flat = x.reshape(-1, x.shape[-1]).float()
+                flat = x.reshape(-1, x.shape[-1])
+                if act == fk.ACT_SILU:
+                    flat = torch.nn.functional.silu(flat)
+                elif act == fk.ACT_SILU_MUL:
+                    flat = fk.silu_mul(flat.contiguous())
+                flat = flat.float()
                 if name not in covariances.matrices:
                     covariances.matrices[name] = torch.zeros((flat.shape[1], flat.shape[1]), device=flat.device)
                     covariances.rows[name] = 0
                 covariances.matrices[name].addmm_(flat.T, flat)
                 covariances.rows[name] += flat.shape[0]
-            return covariances.original(lin, x)
+            return covariances.original(lin, x, act=act, **kw)
         TrunkLinear.__call__ = call
         return self
 
