@@ -23,3 +23,6 @@ ci-out/
 
 # Claude Code session state and worktrees
 .claude/
+
+# tools/spark: local secrets
+tools/spark/tg.env

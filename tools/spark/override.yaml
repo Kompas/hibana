@@ -1,0 +1,6 @@
+services:
+  hibana:
+    environment:
+      HIBANA_W3_CHECKPOINT: ${W3_CKPT:-auto}
+    volumes:
+      - /home/tim/hibana-step2/step3/gb10.env:/opt/hibana/config/gb10.env:ro
