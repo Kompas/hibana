@@ -13,7 +13,7 @@ bench() {  # bench LABEL URL MODEL
   log "$1: start (limit ${t}s)"
   timeout "$t" tool-eval-bench --base-url "$2" --model "$3" --hardmode --seed 42 --temperature 0 --parallel 4 \
      --no-live --label "$1" --json-file "$OUT/$1.json" > "$LOG/teb-$1.log" 2>&1; log "$1: rc=$?"
-  SUMMARY="$SUMMARY $1: $(python3 -c "import json;d=json.load(open('$OUT/$1.json'));print(d.get('score', d.get('summary',{}).get('score','?')))" 2>/dev/null || echo '?')."
+  SUMMARY="$SUMMARY $1: $(python3 -c "import json;d=json.load(open('$OUT/$1.json'));print(d['final_score'])" 2>/dev/null || echo '?')."
 }
 serve() {
   log "serve $1"; PROFILE=$1 W3_CKPT=$2 docker compose $CF up -d --no-deps --force-recreate hibana >> "$LOG/serve.log" 2>&1
