@@ -232,7 +232,7 @@ def other_gpu_work() -> list[str]:
     """Model servers and GPU processes that are not this tool's: Hibana services, model containers, GPU processes."""
     busy = []
     units = subprocess.run(["systemctl", "--user", "list-units", "--state=active", "--plain", "--no-legend", "hibana-*.service", "sharar-*.service"],
-                           capture_output=True, text=True).stdout.split()
+                           capture_output=True, text=True).stdout.split() if shutil.which("systemctl") else []  # none in a container
     busy += [u for u in units if u.endswith(".service")]
     out = subprocess.run(["docker", "ps", "--format", "{{.Names}}\t{{.Image}}"], capture_output=True, text=True).stdout if shutil.which("docker") else ""
     rows = [line.split("\t") for line in out.splitlines() if "\t" in line]
