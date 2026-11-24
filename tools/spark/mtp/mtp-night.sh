@@ -74,8 +74,13 @@ free_gb=$(df -BG --output=avail "$HOSTDATA" | tail -1 | tr -dc 0-9)
 tg "start $(date +%H:%M), vLLM off until ${END_AT:-06:10} at the latest"
 [ "$DRY" = 1 ] || { docker stop vllm_node >/dev/null && log "vLLM stopped"; }
 
-# 0. agent eval, stock head on edp weights: the baseline, and proof the image works in-process
 AE="python $CODE/agent_eval.py --prompts /mtp/data/prompts-eval.jsonl --max-new 256"
+CP="python $CODE/mtp_capture.py --out $CAP --hf-root /hf --w3-checkpoint $RECAL"
+# CONT=1: continue a night whose phases 0-4 already ran (results in $EV); EQ forced to pass after review of equiv.json
+EQ=0
+if [ "${CONT:-0}" = 1 ]; then EQ=1; add "continued $(date +%H:%M) after equiv review (acceptance within 0.3 pt; top-1 line missed)."
+else
+# 0. agent eval, stock head on edp weights: the baseline, and proof the image works in-process
 crun eval-stock 2400 "$AE --hf-root /hf --w3-checkpoint $RECAL --label edp-stockhead --out $EV/stock.json --max-minutes \$((TL/60-5))"
 if [ $? -ne 0 ] && [ "$HIBANA_IMAGE" = hibana-spark:ce49b40 ]; then
   export HIBANA_IMAGE=hibana-flashnext:d474b74d-r2; log "fork image failed, retrying with $HIBANA_IMAGE"
@@ -89,17 +94,17 @@ ROOT=$STOCK crun eval-stockbase 1800 "$AE --hf-root /hf --w3-checkpoint $PUB --l
   && add "gap (edp/stock-base): $(jget $HEV/gap.json groups.all.tok_per_round.ratio)."
 
 # 2. capture held-out + general (fast target, edp weights)
-CP="python $CODE/mtp_capture.py --out $CAP --hf-root /hf --w3-checkpoint $RECAL"
 crun cap-heldout 2700 "$CP --set heldout --seqs /mtp/data/seqs-heldout.jsonl --max-tokens 131072 --max-minutes \$((TL/60-5)) --max-bytes 40e9" || add "cap-heldout rc!=0."
 crun cap-general 1500 "$CP --set general --general /data/step3/inputs.json --max-minutes \$((TL/60-5)) --max-bytes 6e9" || add "cap-general rc!=0."
 
 # 3. equivalence gate: our differentiable head against Hibana's own FP8 head on the same rows
-EQ=0
 crun equiv 1500 "python $CODE/mtp_equiv.py --capture-root $CAP --set heldout --snapshot /hf --depth 4 --max-windows 24 --chains-per-window 256 --batch 32 --draft-head w2 --fast-rule 3:2.0 --out $EV/equiv.json --dump-dir /data/mtp/equiv-dump"
 case $? in 0) EQ=1; add "equiv PASS.";; 2) add "equiv FAIL (training skipped; dumps kept).";; *) add "equiv ERROR (training skipped).";; esac
 
 # 4. teacher-forced baseline with Hibana's head (held-out + general)
 crun tf-stock 1800 "python $CODE/mtp_tf_accept.py --capture-root $CAP --set heldout --set general --impl hibana --snapshot /hf --depth 4 --out $EV/tf-stock.json"
+
+fi
 
 if [ $EQ = 1 ]; then
   # 5. capture train (128k-context variant), as much as fits
