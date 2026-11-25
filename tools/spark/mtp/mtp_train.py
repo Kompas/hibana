@@ -45,7 +45,7 @@ from mtp_tf_accept import rules_of, torch_accept  # noqa: E402
 class Pool:
     """Every window of the training sets with its sampling weight."""
 
-    def __init__(self, capture_root, train_set, general_set, agent_frac, zeroclaw_boost, window_rows, min_rows=8):
+    def __init__(self, capture_root, train_set, general_set, agent_frac, zeroclaw_boost, window_rows, min_rows=8, include_ids=None):
         self.entries = []  # (shard path, window index, rows, source, kind)
         self.shards = {}
         for kind, name in (("agent", train_set), ("general", general_set)):
@@ -56,6 +56,8 @@ class Pool:
                 self.shards[path] = sh
                 for i in range(len(sh)):
                     n = min(sh.rows(i), window_rows)
+                    if kind == "agent" and include_ids is not None and sh.seq_ids[i] not in include_ids:
+                        continue
                     if n >= min_rows:
                         self.entries.append((path, i, n, sh.sources[i], kind))
         if not self.entries:
@@ -233,6 +235,7 @@ def parse(argv=None):
     ap.add_argument("--general-set", default="general", help="'' to train on the agent set only")
     ap.add_argument("--heldout-set", default="heldout")
     ap.add_argument("--agent-frac", type=float, default=0.7)
+    ap.add_argument("--include-ids", help="file with one train seq_id per line: only these agent windows are used")
     ap.add_argument("--zeroclaw-boost", type=float, default=5.0)
     ap.add_argument("--window-rows", type=int, default=4096)
     ap.add_argument("--tokens-per-step", type=int, default=8192, help="rows per optimizer step (whole windows, accumulated)")
@@ -286,7 +289,8 @@ def main(argv=None) -> int:
     if len(weights) != args.depth:
         raise ValueError("--depth-weights needs one weight per depth")
     try:
-        pool = Pool(args.capture_root, args.train_set, args.general_set, args.agent_frac, args.zeroclaw_boost, args.window_rows)
+        inc = set(open(args.include_ids).read().split()) if args.include_ids else None
+        pool = Pool(args.capture_root, args.train_set, args.general_set, args.agent_frac, args.zeroclaw_boost, args.window_rows, include_ids=inc)
     except FileNotFoundError as e:
         if not args.dry_run:
             raise
