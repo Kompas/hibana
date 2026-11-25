@@ -137,7 +137,7 @@ except Exception: print(0)")
         && add "AGENT tuned/stock tok/round: all $(jget $HEV/compare.json groups.all.tok_per_round.ratio) $(jget $HEV/compare.json groups.all.tok_per_round.ci95), pi $(jget $HEV/compare.json groups.pi.tok_per_round.ratio), zeroclaw $(jget $HEV/compare.json groups.zeroclaw.tok_per_round.ratio) (1 prompt), decode tok/s $(jget $HEV/compare.json groups.all.decode_tps.ratio), warnings $(jget $HEV/compare.json warnings)."
       # 9. served smoke test of the tuned snapshot
       if [ "$(left)" -gt 1200 ] && ROOT=$TUNED serve fast "$RECAL"; then
-        [ "$DRY" = 1 ] || timeout 1200 python3 "$S/smoke_test.py" http://127.0.0.1:8888 "$M/logs/night/smoke-tuned.json" > "$LOG/smoke-tuned.log" 2>&1
+        [ "$DRY" = 1 ] || timeout 1200 python3 "$S/step2_test.py" http://127.0.0.1:8888 "$M/logs/night/smoke-tuned.json" > "$LOG/smoke-tuned.log" 2>&1
         add "smoke tuned: $(head -1 "$LOG/smoke-tuned.log" 2>/dev/null)."; unserve
       else add "smoke serve skipped/failed."; fi
       # 10. lossy gate on the tuned head (general workloads, KL vs exact), if time is left
